@@ -44,6 +44,41 @@ const hash_k1: u32 = 15823;
 const hash_k2: u32 = 9737333;
 const hash_k3: u32 = 440817757;
 
+fn getOffset(i: i32) -> vec2<i32> {
+    switch(i) {
+            case 0: {
+            return vec2<i32>(-1, 1);
+        }
+            case 1: {
+            return vec2<i32>(0, 1);
+        }
+            case 2: {
+            return vec2<i32>(1, 1);
+        }
+            case 3: {
+            return vec2<i32>(-1, 0);
+        }
+            case 4: {
+            return vec2<i32>(0, 0);
+        }
+            case 5: {
+            return vec2<i32>(1, 0);
+        }
+            case 6: {
+            return vec2<i32>(-1, -1);
+        }
+            case 7: {
+            return vec2<i32>(0, -1);
+        }
+            case 8: {
+            return vec2<i32>(1, -1);
+        }
+            default: {
+            return vec2<i32>(0, 0);
+        }
+    }
+}
+
 fn getCell2D(position: vec2<f32>, radius: f32) -> vec2<i32> {
     return vec2<i32>(floor(position / radius));
 }
@@ -93,9 +128,9 @@ fn hslToRgb(h: f32, s: f32, l: f32) -> vec3<f32> {
 
 fn force(r: f32, a: f32) -> f32 {
     let beta: f32 = 0.3;
-    if (r < beta) {
+    if r < beta {
         return r / beta - 1.0;
-    } else if (beta < r && r < 1.0) {
+    } else if beta < r && r < 1.0 {
         return a * (1.0 - abs(2.0 * r - 1.0 - beta) / (1.0 - beta));
     } else {
         return 0.0;

@@ -100,3 +100,4 @@ pub fn read_buffer(buffer: &Buffer, device: &RenderDevice, queue: &RenderQueue) 
 
     println!("{:?}", result);
 }
+

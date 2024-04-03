@@ -3,6 +3,7 @@ use crate::particle_config::ParticleConfig;
 use crate::particle_system::ParticleSystemRender;
 
 use crate::{ParticleSystem, WORKGROUP_SIZE};
+use bevy::render::render_graph::RenderLabel;
 use bevy::render::texture::GpuImage;
 use bevy::{
     prelude::*,
@@ -14,7 +15,7 @@ use bevy::{
 };
 
 #[derive(Resource, Clone)]
-pub struct ParticleRenderPipeline {
+pub struct ParticleRenderPipelineConfig {
     bind_group_layout: BindGroupLayout,
     clear_pipeline: CachedComputePipelineId,
     render_pipeline: CachedComputePipelineId,
@@ -25,6 +26,9 @@ pub struct RenderParticlesNode {
     render_state: ParticleRenderState,
 }
 
+#[derive(Debug, Hash, PartialEq, Eq, Clone, RenderLabel)]
+pub struct RenderParticlesRenderLabel;
+
 #[derive(Default, Clone, Debug)]
 enum ParticleRenderState {
     #[default]
@@ -34,13 +38,13 @@ enum ParticleRenderState {
 
 pub fn create_render_bind_group(
     render_device: &RenderDevice,
-    render_pipeline: &ParticleRenderPipeline,
+    render_pipeline_config: &ParticleRenderPipelineConfig,
     particle_system_render: &ParticleSystemRender,
     view: &GpuImage,
 ) -> BindGroup {
     render_device.create_bind_group(
         None,
-        &render_pipeline.bind_group_layout,
+        &render_pipeline_config.bind_group_layout,
         &[
             BindGroupEntry {
                 binding: 0,
@@ -70,7 +74,7 @@ pub fn create_render_bind_group(
     )
 }
 
-impl FromWorld for ParticleRenderPipeline {
+impl FromWorld for ParticleRenderPipelineConfig {
     fn from_world(world: &mut World) -> Self {
         let bind_group_layout = world.resource::<RenderDevice>().create_bind_group_layout(
             "render_bind_group_layout",
@@ -126,7 +130,7 @@ impl FromWorld for ParticleRenderPipeline {
             shader_defs,
         ));
 
-        ParticleRenderPipeline {
+        ParticleRenderPipelineConfig {
             bind_group_layout,
             clear_pipeline,
             render_pipeline,
@@ -137,7 +141,7 @@ impl FromWorld for ParticleRenderPipeline {
 impl render_graph::Node for RenderParticlesNode {
     fn update(&mut self, world: &mut World) {
         let mut systems = world.query_filtered::<Entity, With<ParticleSystem>>();
-        let pipeline = world.resource::<ParticleRenderPipeline>();
+        let pipeline = world.resource::<ParticleRenderPipelineConfig>();
         let pipeline_cache = world.resource::<PipelineCache>();
 
         for entity in systems.iter(world) {
@@ -154,7 +158,7 @@ impl render_graph::Node for RenderParticlesNode {
         world: &World,
     ) -> Result<(), render_graph::NodeRunError> {
         let pipeline_cache = world.resource::<PipelineCache>();
-        let pipeline = world.resource::<ParticleRenderPipeline>();
+        let pipeline = world.resource::<ParticleRenderPipelineConfig>();
         let particle_systems_render = world.resource::<ParticleSystemRender>();
         let particle_config = world.resource::<ParticleConfig>();
 
@@ -197,7 +201,7 @@ impl RenderParticlesNode {
         &mut self,
         entity: Entity,
         pipeline_cache: &PipelineCache,
-        pipeline: &ParticleRenderPipeline,
+        pipeline: &ParticleRenderPipelineConfig,
     ) {
         match self.render_state {
             ParticleRenderState::Loading => {

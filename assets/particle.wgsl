@@ -19,3 +19,9 @@ struct ParticleConfig {
     force_factor: f32,
     friction_factor: f32,
 };
+
+struct HashGridEntry {
+    original_index: u32,
+    hash: u32,
+    key: u32,
+};

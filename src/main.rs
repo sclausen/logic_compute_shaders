@@ -18,11 +18,15 @@ mod particle_config;
 mod particle_render;
 mod particle_system;
 mod particle_ui;
+mod particle_plugin;
 mod particle_update;
 mod system_runner;
+mod particle_cpu;
+mod sort_spatial_hash_grid;
 
 use particle_config::ParticleConfig;
-use particle_system::{ParticlePlugin, ParticleSystem, RecreateParticles};
+use particle_plugin::ParticlePlugin;
+use particle_system::{ParticleSystem, RecreateParticles};
 
 fn main() {
     let mut app = App::new();
@@ -39,7 +43,7 @@ fn main() {
                 ..default()
             })
             .set(LogPlugin {
-                filter: "info,wgpu_core=warn,wgpu_hal=warn,logic_gpu_particles=debug".into(),
+                filter: "info,wgpu_core=warn,wgpu_hal=warn,logic_gpu_particles=debug,logic_gpu_particles::sort_spatial_hash_grid=info".into(),
                 level: bevy::log::Level::DEBUG,
                 update_subscriber: None,
             }), //.disable::<bevy::log::LogPlugin>(),
