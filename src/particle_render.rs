@@ -144,8 +144,8 @@ impl render_graph::Node for RenderParticlesNode {
         let pipeline = world.resource::<ParticleRenderPipelineConfig>();
         let pipeline_cache = world.resource::<PipelineCache>();
 
-        for entity in systems.iter(world) {
-            self.update_state(entity, pipeline_cache, pipeline);
+        for _ in systems.iter(world) {
+            self.update_state(pipeline_cache, pipeline);
         }
 
         self.particle_system.update_archetypes(world);
@@ -174,6 +174,8 @@ impl render_graph::Node for RenderParticlesNode {
                     &particle_systems_render.render_bind_group.as_ref().unwrap(),
                     pipeline_cache,
                     clear_pipeline,
+                    particle_config.world_width,
+                    particle_config.world_height,
                 );
 
                 run_compute_pass(
@@ -197,9 +199,9 @@ impl RenderParticlesNode {
             render_state: ParticleRenderState::default(),
         }
     }
+
     fn update_state(
         &mut self,
-        entity: Entity,
         pipeline_cache: &PipelineCache,
         pipeline: &ParticleRenderPipelineConfig,
     ) {

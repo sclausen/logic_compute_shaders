@@ -1,20 +1,20 @@
-struct Entry {
+struct SpatialIndex {
     original_index: u32,
     hash: u32,
     key: u32,
 };
 
-@group(0) @binding(0) var<storage, read_write> entries: array<Entry>;
+@group(0) @binding(0) var<storage, read_write> spatial_indices: array<SpatialIndex>;
 @group(0) @binding(1) var<uniform> num_entries: u32;
 @group(0) @binding(2) var<uniform> group_width: u32;
 @group(0) @binding(3) var<uniform> group_height: u32;
 @group(0) @binding(4) var<uniform> step_index: u32;
-@group(0) @binding(5) var<storage, read_write> offsets: array<u32>;
+@group(0) @binding(5) var<storage, read_write> spatial_offsets: array<u32>;
 
-// Sort the given entries by their keys (smallest to largest)
+// Sort the given spatial_indices by their keys (smallest to largest)
 // This is done using bitonic merge sort, and takes multiple iterations
 @compute @workgroup_size(128, 1, 1)
-fn Sort(@builtin(global_invocation_id) id: vec3<u32>) {
+fn sort_spatial_indices(@builtin(global_invocation_id) id: vec3<u32>) {
     let i = id.x;
 
     let h_index = i & (group_width - 1);
@@ -32,14 +32,14 @@ fn Sort(@builtin(global_invocation_id) id: vec3<u32>) {
         return;
     }
 
-    let value_left = entries[index_left].key;
-    let value_right = entries[index_right].key;
+    let value_left = spatial_indices[index_left].key;
+    let value_right = spatial_indices[index_right].key;
 
-    // Swap entries if value is descending
+    // Swap spatial_indices if value is descending
     if value_left > value_right {
-        let temp = entries[index_left];
-        entries[index_left] = entries[index_right];
-        entries[index_right] = temp;
+        let temp = spatial_indices[index_left];
+        spatial_indices[index_left] = spatial_indices[index_right];
+        spatial_indices[index_right] = temp;
     }
 }
 
@@ -58,7 +58,7 @@ fn Sort(@builtin(global_invocation_id) id: vec3<u32>) {
 // 
 // NOTE: offsets buffer must filled with values equal to (or greater than) its length to ensure that this works correctly
 @compute @workgroup_size(128, 1, 1)
-fn CalculateOffsets(@builtin(global_invocation_id) id: vec3<u32>) {
+fn calculate_offsets(@builtin(global_invocation_id) id: vec3<u32>) {
     if id.x >= num_entries {
         return;
     }
@@ -66,15 +66,15 @@ fn CalculateOffsets(@builtin(global_invocation_id) id: vec3<u32>) {
     let i = id.x;
     let null_val = num_entries;
 
-    let key = entries[i].key;
+    let key = spatial_indices[i].key;
     var key_prev: u32 = u32(0);
     if i == 0 {
         key_prev = null_val;
     } else {
-        key_prev = entries[i - 1].key;
+        key_prev = spatial_indices[i - 1].key;
     }
 
     if key != key_prev {
-        offsets[key] = i;
+        spatial_offsets[key] = i;
     }
 }

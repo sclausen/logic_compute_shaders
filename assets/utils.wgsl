@@ -1,50 +1,7 @@
-const offsets_2d: array<vec2<i32>, 9> = array<vec2<i32>, 9>(
-    vec2<i32>(-1, 1),
-    vec2<i32>(0, 1),
-    vec2<i32>(1, 1),
-    vec2<i32>(-1, 0),
-    vec2<i32>(0, 0),
-    vec2<i32>(1, 0),
-    vec2<i32>(-1, -1),
-    vec2<i32>(0, -1),
-    vec2<i32>(1, -1),
-);
-
-const offsets_3d: array<vec3<i32>, 27> = array<vec3<i32>, 27>(
-    vec3<i32>(-1, -1, -1),
-    vec3<i32>(-1, -1, 0),
-    vec3<i32>(-1, -1, 1),
-    vec3<i32>(-1, 0, -1),
-    vec3<i32>(-1, 0, 0),
-    vec3<i32>(-1, 0, 1),
-    vec3<i32>(-1, 1, -1),
-    vec3<i32>(-1, 1, 0),
-    vec3<i32>(-1, 1, 1),
-    vec3<i32>(0, -1, -1),
-    vec3<i32>(0, -1, 0),
-    vec3<i32>(0, -1, 1),
-    vec3<i32>(0, 0, -1),
-    vec3<i32>(0, 0, 0),
-    vec3<i32>(0, 0, 1),
-    vec3<i32>(0, 1, -1),
-    vec3<i32>(0, 1, 0),
-    vec3<i32>(0, 1, 1),
-    vec3<i32>(1, -1, -1),
-    vec3<i32>(1, -1, 0),
-    vec3<i32>(1, -1, 1),
-    vec3<i32>(1, 0, -1),
-    vec3<i32>(1, 0, 0),
-    vec3<i32>(1, 0, 1),
-    vec3<i32>(1, 1, -1),
-    vec3<i32>(1, 1, 0),
-    vec3<i32>(1, 1, 1)
-);
-
 const hash_k1: u32 = 15823;
 const hash_k2: u32 = 9737333;
-const hash_k3: u32 = 440817757;
 
-fn getOffset(i: i32) -> vec2<i32> {
+fn get_offset2(i: i32) -> vec2<i32> {
     switch(i) {
             case 0: {
             return vec2<i32>(-1, 1);
@@ -79,31 +36,57 @@ fn getOffset(i: i32) -> vec2<i32> {
     }
 }
 
-fn getCell2D(position: vec2<f32>, radius: f32) -> vec2<i32> {
-    return vec2<i32>(floor(position / radius));
+fn get_offset(i: i32) -> vec2<i32> {
+    switch (i) {
+            case 0: {
+            return vec2<i32>(-1, -1);
+        }
+            case 1: {
+            return vec2<i32>(-1, 0);
+        }
+            case 2: {
+            return vec2<i32>(-1, 1);
+        }
+            case 3: {
+            return vec2<i32>(0, -1);
+        }
+            case 4: {
+            return vec2<i32>(0, 0);
+        }
+            case 5: {
+            return vec2<i32>(0, 1);
+        }
+            case 6: {
+            return vec2<i32>(1, -1);
+        }
+            case 7: {
+            return vec2<i32>(1, 0);
+        }
+            case 8: {
+            return vec2<i32>(1, 1);
+        }
+            default: {
+            return vec2<i32>(0, 0);
+        }
+    }
 }
 
-fn getCell3D(position: vec3<f32>, radius: f32) -> vec3<i32> {
-    return vec3<i32>(floor(position / radius));
+fn get_cell(position: vec2<f32>, radius: f32) -> vec2<i32> {
+    return vec2<i32>(i32(floor(position.x / radius)), i32(floor(position.y / radius)));
 }
 
-fn hashCell2D(cell: vec2<i32>) -> u32 {
+fn hash_cell(cell: vec2<i32>) -> u32 {
     let cell_u = vec2<u32>(u32(cell.x), u32(cell.y));
     let a: u32 = cell_u.x * hash_k1;
     let b: u32 = cell_u.y * hash_k2;
     return (a + b);
 }
 
-fn hashCell3D(cell: vec3<i32>) -> u32 {
-    let cell_u: vec3<u32> = vec3<u32>(u32(cell.x), u32(cell.y), u32(cell.z));
-    return (cell_u.x * hash_k1) + (cell_u.y * hash_k2) + (cell_u.z * hash_k3);
-}
-
-fn keyFromHash(hash: u32, table_size: u32) -> u32 {
+fn key_from_hash(hash: u32, table_size: u32) -> u32 {
     return hash % table_size;
 }
 
-fn hslToRgb(h: f32, s: f32, l: f32) -> vec3<f32> {
+fn hsl_to_rgb(h: f32, s: f32, l: f32) -> vec3<f32> {
     let c = (1.0 - abs(2.0 * l - 1.0)) * s;
     let x = c * (1.0 - abs(((h / 60.0) % 2.0) - 1.0));
     let m = l - c * 0.5;
@@ -135,4 +118,12 @@ fn force(r: f32, a: f32) -> f32 {
     } else {
         return 0.0;
     }
+}
+
+fn get_wrapped_neighbor_cell(origin_cell: vec2<i32>, index: i32, width: i32, height: i32) -> vec2<i32> {
+    let offset = get_offset(index);
+    let neighbor_cell = vec2<i32>(origin_cell.x + offset.x, origin_cell.y + offset.y);
+    let wrapped_x = (neighbor_cell.x + width) % width;
+    let wrapped_y = (neighbor_cell.y + height) % height;
+    return vec2<i32>(wrapped_x, wrapped_y);
 }

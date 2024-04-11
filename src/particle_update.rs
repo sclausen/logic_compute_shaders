@@ -12,7 +12,7 @@ use crate::{
     particle_config::ParticleConfig,
     particle_system::ParticleSystemRender,
     sort_spatial_hash_grid::sort_spatial_hash_grid,
-    ParticleSystem, HEIGHT, WIDTH, WORKGROUP_SIZE,
+    ParticleSystem, WORKGROUP_SIZE,
 };
 
 #[derive(Resource, Clone)]
@@ -316,13 +316,8 @@ impl FromWorld for ParticleUpdatePipelineConfig {
             create_update_bind_group_layout(&world.resource::<RenderDevice>());
 
         let particle_update_shader = &world.resource::<AssetServer>().load("particle_update.wgsl");
-        //   let gpu_sort_shader = world.resource::<AssetServer>().load("gpu_sort.wgsl");
 
-        let shader_defs = vec![
-            ShaderDefVal::UInt("WIDTH".into(), (WIDTH as u32).into()),
-            ShaderDefVal::UInt("HEIGHT".into(), (HEIGHT as u32).into()),
-            ShaderDefVal::UInt("WORKGROUP_SIZE".into(), WORKGROUP_SIZE),
-        ];
+        let shader_defs = vec![ShaderDefVal::UInt("WORKGROUP_SIZE".into(), WORKGROUP_SIZE)];
 
         let pipeline_cache = &world.resource_mut::<PipelineCache>();
 
@@ -359,7 +354,7 @@ impl FromWorld for ParticleUpdatePipelineConfig {
 
         let sort_pipeline = pipeline_cache.queue_compute_pipeline(compute_pipeline_descriptor(
             sort_shader.clone(),
-            "Sort",
+            "sort_spatial_indices",
             &sort_bind_group_layout,
             vec![],
         ));
@@ -367,7 +362,7 @@ impl FromWorld for ParticleUpdatePipelineConfig {
         let calculate_offsets_pipeline =
             pipeline_cache.queue_compute_pipeline(compute_pipeline_descriptor(
                 sort_shader.clone(),
-                "CalculateOffsets",
+                "calculate_offsets",
                 &sort_bind_group_layout,
                 vec![],
             ));
@@ -391,10 +386,8 @@ impl render_graph::Node for UpdateParticlesNode {
         let pipeline_cache = world.resource::<PipelineCache>();
 
         if systems.get_single(world).is_ok() {
-            // if the corresponding pipeline has loaded, transition to the next stage
             self.update_state(pipeline_cache, pipeline_config);
         }
-        // Update the query for the run step
         self.particle_system.update_archetypes(world);
     }
 

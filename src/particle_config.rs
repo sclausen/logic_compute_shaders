@@ -1,11 +1,12 @@
 use bevy::{
+    log,
     prelude::*,
     render::{extract_resource::ExtractResource, render_resource::ShaderType},
 };
-use rand::{rngs::ThreadRng, Rng};
-use rand_distr::{Distribution, Normal};
+use nanorand::{Rng, WyRand};
 use serde::{Deserialize, Serialize};
-use std::hash::{Hash, Hasher};
+
+use crate::my_rand::MyRand;
 
 #[derive(Debug, Clone, Resource, Reflect, Serialize, Deserialize, ExtractResource)]
 #[reflect(Resource)]
@@ -14,11 +15,17 @@ pub struct ParticleConfig {
     pub dt: f32,
     pub friction_half_life: f32,
     pub r_max: f32,
-    pub m: usize,
+    pub variants: usize,
     pub force_factor: f32,
     pub friction_factor: f32,
     pub attraction_matrix: Vec<f32>,
-    pub recreate: bool,
+    pub is_grayscale: bool,
+    pub world_width: u32,
+    pub world_height: u32,
+    pub seed: u64,
+    #[reflect(ignore)]
+    #[serde(skip)]
+    pub rng: MyRand,
 }
 
 impl ParticleConfig {
@@ -28,11 +35,28 @@ impl ParticleConfig {
             dt: self.dt,
             friction_half_life: self.friction_half_life,
             r_max: self.r_max,
-            m: self.m as u32,
+            variants: self.variants as u32,
             force_factor: self.force_factor,
             friction_factor: self.friction_factor,
+            world_width: self.world_width as f32,
+            world_height: self.world_height as f32,
         };
         (shader_config, self.attraction_matrix.clone())
+    }
+
+    pub fn calculate_world_size(r_max: f32) -> (u32, u32) {
+        let desired_size: f32 = 800.0;
+        let cell_size = r_max;
+
+        let num_cells_w = (desired_size / cell_size).round();
+        let num_cells_h = num_cells_w;
+
+        let new_width = (num_cells_w * cell_size).round() as u32;
+        let new_height = (num_cells_h * cell_size).round() as u32;
+
+        log::debug!("World size: {} x {}", new_width, new_height);
+
+        (new_width, new_height)
     }
 }
 
@@ -42,86 +66,49 @@ pub struct ShaderParticleConfig {
     pub dt: f32,
     pub friction_half_life: f32,
     pub r_max: f32,
-    pub m: u32,
+    pub variants: u32,
     pub force_factor: f32,
     pub friction_factor: f32,
+    pub world_width: f32,
+    pub world_height: f32,
 }
 
 impl Default for ParticleConfig {
     fn default() -> Self {
-        let mut rng = rand::thread_rng();
         let friction_half_life = 0.02;
-        let dt = 0.0004;
-        let m = rng.gen_range(1..=10);
+        let dt = 0.002;
+        let variants = 6;
         let n = 1;
+        let r_max = 50.0;
+
+        let (world_width, world_height) = Self::calculate_world_size(r_max);
+
+        let mut rng = MyRand::default();
 
         Self {
             n,
             dt,
             friction_half_life,
-            r_max: 50.0,
-            m,
-            force_factor: 10.0,
+            r_max,
+            variants,
+            force_factor: 15.0,
             friction_factor: 0.5f32.powf(dt / friction_half_life),
-            attraction_matrix: make_random_matrix(m),
-            recreate: false,
+            attraction_matrix: make_random_matrix(variants, &mut rng),
+            is_grayscale: true,
+            world_width,
+            world_height,
+            seed: 0,
+            rng,
         }
     }
 }
 
-pub fn make_random_matrix(m: usize) -> Vec<f32> {
-    let mut rng = rand::thread_rng();
-    let mut matrix = vec![0.0; m * m];
-    for i in 0..m {
-        for j in 0..m {
-            matrix[i * m + j] = generate_random_gaussian(&mut rng);
+pub fn make_random_matrix(variants: usize, rng: &mut WyRand) -> Vec<f32> {
+    let mut matrix = vec![0.0; variants * variants];
+    for i in 0..variants {
+        for j in 0..variants {
+            matrix[i * variants + j] = rng.generate::<f32>() * 2f32 - 1f32;
         }
     }
     matrix
-}
-
-impl PartialEq for ParticleConfig {
-    fn eq(&self, other: &Self) -> bool {
-        self.n == other.n
-            && self.m == other.m
-            && self.recreate == other.recreate
-            && float_eq(self.dt, other.dt)
-            && float_eq(self.friction_half_life, other.friction_half_life)
-            && float_eq(self.r_max, other.r_max)
-            && float_eq(self.force_factor, other.force_factor)
-            && float_eq(self.friction_factor, other.friction_factor)
-    }
-}
-
-impl Eq for ParticleConfig {}
-
-impl Hash for ParticleConfig {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.n.hash(state);
-        self.m.hash(state);
-        hash_float(self.dt, state);
-        hash_float(self.friction_half_life, state);
-        hash_float(self.r_max, state);
-        hash_float(self.force_factor, state);
-        hash_float(self.friction_factor, state);
-    }
-}
-
-fn float_eq(a: f32, b: f32) -> bool {
-    (a - b).abs() < f32::EPSILON
-}
-
-fn hash_float<F: Hasher>(f: f32, state: &mut F) {
-    let bits = f.to_bits();
-    bits.hash(state);
-}
-
-fn generate_random_gaussian(rng: &mut ThreadRng) -> f32 {
-    let normal_dist = Normal::new(0.0, 0.5).unwrap();
-    loop {
-        let value = normal_dist.sample(rng);
-        if value >= -1.0 && value <= 1.0 {
-            return value;
-        }
-    }
 }

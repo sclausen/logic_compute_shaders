@@ -1,9 +1,9 @@
-#import "particle.wgsl"::{Particles,ParticleConfig}
-#import "utils.wgsl"::{hslToRgb}
+#import "particle.wgsl"::{Particle, ParticleConfig}
+#import "utils.wgsl"::{hsl_to_rgb}
 
 
 @group(0) @binding(0)
-var<storage, read_write> particles: array<Particles>;
+var<storage, read_write> particles: array<Particle>;
 
 @group(0) @binding(1)
 var<uniform> particle_config: ParticleConfig;
@@ -32,10 +32,10 @@ fn render(
 
     var location = vec2<i32>(particles[id].position);
 
-    let hue: f32 = 360.0 * (f32(particles[id].particle_type) / f32(particle_config.m));
+    let hue: f32 = 360.0 * (f32(particles[id].particle_type) / f32(particle_config.variants));
     let saturation: f32 = 1.0;
     let lightness: f32 = 0.5;
-    let color: vec3<f32> = hslToRgb(hue, saturation, lightness);
+    let color: vec3<f32> = hsl_to_rgb(hue, saturation, lightness);
 
     textureStore(texture, location, vec4<f32>(color, 1.0));
 }

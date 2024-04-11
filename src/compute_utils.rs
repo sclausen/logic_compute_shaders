@@ -1,15 +1,11 @@
-use std::{borrow::Cow, ops::Deref};
+use std::borrow::Cow;
 
 use bevy::{
     prelude::*,
-    render::{
-        render_resource::*,
-        renderer::{RenderContext, RenderDevice, RenderQueue},
-    },
+    render::{render_resource::*, renderer::RenderContext},
 };
-use wgpu::Maintain;
 
-use crate::{HEIGHT, WIDTH, WORKGROUP_SIZE};
+use crate::WORKGROUP_SIZE;
 
 pub fn compute_pipeline_descriptor(
     shader: Handle<Shader>,
@@ -27,7 +23,7 @@ pub fn compute_pipeline_descriptor(
     }
 }
 
-pub fn compute_pass<'a>(
+fn compute_pass<'a>(
     render_context: &'a mut RenderContext,
     bind_group: &'a BindGroup,
     pipeline_cache: &'a PipelineCache,
@@ -60,44 +56,10 @@ pub fn run_compute_pass_2d(
     bind_group: &BindGroup,
     pipeline_cache: &PipelineCache,
     pipeline: CachedComputePipelineId,
+    width: u32,
+    height: u32,
 ) {
     let mut pass = compute_pass(render_context, bind_group, pipeline_cache, pipeline);
 
-    pass.dispatch_workgroups(
-        WIDTH as u32 / WORKGROUP_SIZE,
-        HEIGHT as u32 / WORKGROUP_SIZE,
-        1,
-    );
+    pass.dispatch_workgroups(width / WORKGROUP_SIZE, height / WORKGROUP_SIZE, 1);
 }
-
-// Helper function to print out gpu data for debugging
-#[allow(dead_code)]
-pub fn read_buffer(buffer: &Buffer, device: &RenderDevice, queue: &RenderQueue) {
-    let mut encoder = device.create_command_encoder(&CommandEncoderDescriptor { label: None });
-
-    let scratch = vec![0; buffer.size() as usize];
-    let dest = device.create_buffer_with_data(&BufferInitDescriptor {
-        label: None,
-        usage: BufferUsages::COPY_DST | BufferUsages::MAP_READ,
-        contents: scratch.as_ref(),
-    });
-
-    encoder.copy_buffer_to_buffer(buffer, 0, &dest, 0, buffer.size());
-    queue.submit([encoder.finish()]);
-
-    let slice = dest.slice(..);
-    slice.map_async(wgpu::MapMode::Read, move |result| {
-        let err = result.err();
-        if err.is_some() {
-            panic!("{}", err.unwrap().to_string());
-        }
-    });
-
-    device.poll(Maintain::Wait);
-
-    let data = slice.get_mapped_range();
-    let result = Vec::from(data.deref());
-
-    println!("{:?}", result);
-}
-

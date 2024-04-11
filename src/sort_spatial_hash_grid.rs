@@ -23,38 +23,19 @@ pub fn sort_spatial_hash_grid(
 ) {
     log::debug!("Beginning GPU compute for {:?} particles.", num_entries);
 
-    // queue.write_buffer(
-    //     &particle_system_render
-    //         .spatial_indices_buffer
-    //         .as_ref()
-    //         .unwrap(),
-    //     0,
-    //     bytemuck::cast_slice(local_entries),
-    // );
-    // queue.write_buffer(
-    //     &particle_system_render
-    //         .spatial_offsets_buffer
-    //         .as_ref()
-    //         .unwrap(),
-    //     0,
-    //     bytemuck::cast_slice(local_offsets),
-    // );
-    // log::debug!("Wrote to buffer.");
-
-    // let num_entries = local_entries.len() as u32;
-    // log::debug!("Number of entries: {}", num_entries);
-
-    // queue.write_buffer(
-    //     &particle_system_render.num_entries_buffer.as_ref().unwrap(),
-    //     0,
-    //     bytemuck::bytes_of(&num_entries),
-    // );
-
     let num_stages = (num_entries.next_power_of_two() as f32).log2() as u32;
     log::debug!("Number of stages: {}", num_stages);
     let sort_pipeline = pipeline_cache
         .get_compute_pipeline(context.sort_pipeline)
         .unwrap();
+
+    let indirect_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("Indirect Dispatch Buffer"),
+        size: std::mem::size_of::<wgpu::util::DispatchIndirectArgs>() as u64,
+        usage: wgpu::BufferUsages::INDIRECT | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    });
+
     for stage_index in 0..num_stages {
         for step_index in 0..=stage_index {
             let mut command_encoder =
@@ -63,13 +44,13 @@ pub fn sort_spatial_hash_grid(
             let group_width = 1 << (stage_index - step_index);
             let group_height = 2 * group_width - 1;
 
-            log::debug!(
-                "Dispatching stage_index {} step_index {} with group_width {} and group_height {}.",
-                stage_index,
-                step_index,
-                group_width,
-                group_height
-            );
+            let dispatch_args = wgpu::util::DispatchIndirectArgs {
+                x: ((num_entries.next_power_of_two() / 2).max(1) + 255) / 256,
+                y: 1,
+                z: 1,
+            };
+
+            queue.write_buffer(&indirect_buffer, 0, &dispatch_args.as_bytes());
 
             queue.write_buffer(
                 &particle_system_render.group_width_buffer.as_ref().unwrap(),
@@ -86,6 +67,7 @@ pub fn sort_spatial_hash_grid(
                 0,
                 bytemuck::bytes_of(&step_index),
             );
+
             {
                 let mut compute_pass =
                     command_encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
@@ -98,69 +80,27 @@ pub fn sort_spatial_hash_grid(
                     &particle_system_render.sort_bind_group.as_ref().unwrap(),
                     &[],
                 );
-                compute_pass.dispatch_workgroups(num_entries.next_power_of_two() / 2, 1, 1);
+                compute_pass.dispatch_workgroups_indirect(&indirect_buffer, 0);
             }
             queue.submit(Some(command_encoder.finish()));
         }
     }
 
-    // copy the data from the output_entries_buffer back to the entries_buffer
-
-    // let mut command_encoder =
-    //     device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-
-    // let spatial_indices_buffer = &particle_system_render
-    //     .spatial_indices_buffer
-    //     .as_ref()
-    //     .unwrap();
-    // command_encoder.copy_buffer_to_buffer(
-    //     spatial_indices_buffer,
-    //     0,
-    //     &particle_system_render
-    //         .output_spatial_indices_buffer
-    //         .as_ref()
-    //         .unwrap(),
-    //     0,
-    //     spatial_indices_buffer.size(),
-    // );
-
-    // queue.submit(Some(command_encoder.finish()));
-    // log::debug!("Submitted commands.");
-    // let output_entries_buffer_slice = particle_system_render
-    //     .output_spatial_indices_buffer
-    //     .as_ref()
-    //     .unwrap()
-    //     .slice(..);
-
-    // let (entries_sender, entries_receiver) = flume::bounded(1);
-    // output_entries_buffer_slice.map_async(wgpu::MapMode::Read, move |r| {
-    //     entries_sender.send(r).unwrap()
-    // });
-
-    // device.poll(wgpu::Maintain::wait()).panic_on_timeout();
-    // log::debug!("Device polled.");
-    // entries_receiver.recv_async().await.unwrap().unwrap();
-    // log::debug!("Indices result received.");
-    // {
-    //     let view = output_entries_buffer_slice.get_mapped_range();
-    //     local_entries.copy_from_slice(bytemuck::cast_slice(&view));
-    // }
-    // log::debug!("Indices results written to local indices buffer.");
-    // particle_system_render
-    //     .output_spatial_indices_buffer
-    //     .as_ref()
-    //     .unwrap()
-    //     .unmap();
-
     let calculate_offsets_pipeline = pipeline_cache
         .get_compute_pipeline(context.calculate_offsets_pipeline)
         .unwrap();
 
-    // Offsets stuff
     let mut command_encoder =
         device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
 
     {
+        let dispatch_args_for_offsets = wgpu::util::DispatchIndirectArgs {
+            x: (num_entries + 255) / 256, // Adjust for your compute shader's workgroup size
+            y: 1,
+            z: 1,
+        };
+        queue.write_buffer(&indirect_buffer, 0, &dispatch_args_for_offsets.as_bytes());
+
         let mut compute_pass = command_encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("Bitonic Sort Offsets Pass"),
             timestamp_writes: None,
@@ -171,54 +111,8 @@ pub fn sort_spatial_hash_grid(
             &particle_system_render.sort_bind_group.as_ref().unwrap(),
             &[],
         );
-        compute_pass.dispatch_workgroups(num_entries, 1, 1);
+        //compute_pass.dispatch_workgroups(num_entries, 1, 1);
+        compute_pass.dispatch_workgroups_indirect(&indirect_buffer, 0);
     }
     queue.submit(Some(command_encoder.finish()));
-
-    // let mut command_encoder =
-    //     device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-
-    // let particle_offsets_buffer = &particle_system_render
-    //     .spatial_offsets_buffer
-    //     .as_ref()
-    //     .unwrap();
-
-    // command_encoder.copy_buffer_to_buffer(
-    //     particle_offsets_buffer,
-    //     0,
-    //     &particle_system_render
-    //         .output_offsets_buffer
-    //         .as_ref()
-    //         .unwrap(),
-    //     0,
-    //     particle_offsets_buffer.size(),
-    // );
-
-    // queue.submit(Some(command_encoder.finish()));
-
-    // let output_offsets_buffer_slice = particle_system_render
-    //     .output_offsets_buffer
-    //     .as_ref()
-    //     .unwrap()
-    //     .slice(..);
-
-    // let (offsets_sender, offsets_receiver) = flume::bounded(1);
-    // output_offsets_buffer_slice.map_async(wgpu::MapMode::Read, move |r| {
-    //     offsets_sender.send(r).unwrap()
-    // });
-
-    // device.poll(wgpu::Maintain::wait()).panic_on_timeout();
-    // log::debug!("Device polled.");
-    // offsets_receiver.recv_async().await.unwrap().unwrap();
-    // log::debug!("Offsets result received.");
-    // {
-    //     let view = output_offsets_buffer_slice.get_mapped_range();
-    //     local_offsets.copy_from_slice(bytemuck::cast_slice(&view));
-    // }
-    // log::debug!("Results written to local offsets buffer.");
-    // particle_system_render
-    //     .output_offsets_buffer
-    //     .as_ref()
-    //     .unwrap()
-    //     .unmap();
 }
