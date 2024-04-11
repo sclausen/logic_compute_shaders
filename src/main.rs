@@ -17,7 +17,6 @@ mod particle_ui;
 mod particle_update;
 mod sort_spatial_hash_grid;
 mod system_runner;
-mod my_rand;
 
 use particle_plugin::ParticlePlugin;
 use particle_system::ParticleSystem;

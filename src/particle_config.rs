@@ -6,8 +6,6 @@ use bevy::{
 use nanorand::{Rng, WyRand};
 use serde::{Deserialize, Serialize};
 
-use crate::my_rand::MyRand;
-
 #[derive(Debug, Clone, Resource, Reflect, Serialize, Deserialize, ExtractResource)]
 #[reflect(Resource)]
 pub struct ParticleConfig {
@@ -25,7 +23,7 @@ pub struct ParticleConfig {
     pub seed: u64,
     #[reflect(ignore)]
     #[serde(skip)]
-    pub rng: MyRand,
+    pub rng: WyRand,
 }
 
 impl ParticleConfig {
@@ -83,7 +81,7 @@ impl Default for ParticleConfig {
 
         let (world_width, world_height) = Self::calculate_world_size(r_max);
 
-        let mut rng = MyRand::default();
+        let mut rng = WyRand::default();
 
         Self {
             n,
